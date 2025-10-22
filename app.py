@@ -407,7 +407,7 @@ def ShowTimerInfo():
     # ---- Bottom Section: Show tool data for clicked_location ----
     if st.session_state.clicked_location:
         with placeholder.container():
-            col1, col2, col3 = st.columns([1,40,1])
+            col1, col2, col3 = st.columns([1,60,1])
 
             with col2:
                 def clear_selection_clicked_location():
@@ -419,10 +419,13 @@ def ShowTimerInfo():
                 st.button("❌ Close",key = f'close_{st.session_state.clicked_location}' , on_click=clear_selection_clicked_location)
                 st.markdown(f"### 📋 Upcoming Tool Change for {st.session_state.clicked_location}")
 
-                cols = ['Turret','Tool','Process','Balance (mins)', 'Balance (pcs)','MachineID', 'ToolNoID', 'StartDate', 'TotalCounter','PresetCounter', 'LoadX_Alm', 'LoadZ_Alm','mmToolID']
+                cols = ['Turret','Tool','Process','Balance (mins)', 'Balance (pcs)','MachineID', 'ToolNoID', 'StartDate', 'TotalCounter','PresetCounter', 'LoadX_Alm', 'LoadZ_Alm','mmToolID','ToolLife_predicted']
                 df = df_tool_data_all[df_tool_data_all['Location']==st.session_state.clicked_location]
                 df = df[cols].reset_index(drop=True)
                 df = BalanceClustering(df)
+                
+                df['ToolLife_final'] = df.apply(process_tool_life, axis=1)
+
                 #print(df)
                 min_balance = df['Balance (mins)'].min()
                 min_cluster = df[df['Balance (mins)'] == min_balance]['Hierarchical_Distance'].iloc[0]
@@ -430,8 +433,8 @@ def ShowTimerInfo():
                 #min_balance = df['Balance (mins)'].min() + Tool_Change_min
 
                 # Header row
-                header_cols = st.columns([1, 1, 2, 1, 1,1,1, 1,1])
-                header_titles = ['Turret', 'Tool', 'Process','Preset (pcs)','Actual (pcs)', 'Balance (pcs)', 'Balance (mins)', 'LoadX', 'LoadZ']
+                header_cols = st.columns([1, 1, 2, 1, 1,1,1, 1,1,1])
+                header_titles = ['Turret', 'Tool', 'Process','Preset (pcs)','Predicted (pcs)','Actual (pcs)', 'Balance (pcs)', 'Balance (mins)', 'LoadX', 'LoadZ']
                 for col, title in zip(header_cols, header_titles):
                     col.markdown(f"**{title}**")
                 
@@ -451,25 +454,26 @@ def ShowTimerInfo():
                     style = "background-color: #ff3333; padding: 5px;" if highlight else ""
 
 
-                    cols = st.columns([1, 1, 2, 1, 1,1,1, 1,1])  # Adjust column widths
+                    cols = st.columns([1, 1, 2, 1, 1,1,1, 1,1,1])  # Adjust column widths
 
                     cols[0].markdown(f"<div style='{style}'>{row['Turret']}</div>", unsafe_allow_html=True)
                     cols[1].markdown(f"<div style='{style}'>{row['Tool']} ({row['ToolNoID']})</div>", unsafe_allow_html=True)
                     cols[2].markdown(f"<div>{row['Process']} - {row['mmToolID']}</div>", unsafe_allow_html=True)
                     cols[3].markdown(f"<div>{row['PresetCounter']}</div>", unsafe_allow_html=True)
-                    cols[4].markdown(f"<div>{row['TotalCounter']}</div>", unsafe_allow_html=True)
-                    cols[5].markdown(f"<div>{row['Balance (pcs)']}</div>", unsafe_allow_html=True)
-                    cols[6].markdown(f"<div style='{style}'>{row['Balance (mins)']}</div>", unsafe_allow_html=True)
+                    cols[4].markdown(f"<div>{row['ToolLife_final']}</div>", unsafe_allow_html=True)
+                    cols[5].markdown(f"<div>{row['TotalCounter']}</div>", unsafe_allow_html=True)
+                    cols[6].markdown(f"<div>{row['Balance (pcs)']}</div>", unsafe_allow_html=True)
+                    cols[7].markdown(f"<div style='{style}'>{row['Balance (mins)']}</div>", unsafe_allow_html=True)
 
                         
 
-                    if cols[7].button("LoadX", key=f"btn_LoadX_{i}"):
+                    if cols[8].button("LoadX", key=f"btn_LoadX_{i}"):
                         if st.session_state[f'visible_graph_row_{i}'] == "LoadX":
                             st.session_state[f'visible_graph_row_{i}'] = None # Hide if already visible
                         else:
                             st.session_state[f'visible_graph_row_{i}'] = "LoadX"
 
-                    if cols[8].button("LoadZ", key=f"btn_LoadZ_{i}"):
+                    if cols[9].button("LoadZ", key=f"btn_LoadZ_{i}"):
                         if st.session_state[f'visible_graph_row_{i}'] == "LoadZ":
                             st.session_state[f'visible_graph_row_{i}'] = None # Hide if already visible
                         else:
@@ -552,6 +556,13 @@ def GetLowestCPK():
         st.session_state[f'CurrentMachineMaterial_{MachineID}_LowestPpk'] = (
             None if pd.isna(row['Value']) else row['Value']
         )
+
+
+def process_tool_life(row):
+    if pd.isna(row['ToolLife_predicted']):
+        return 0
+    rounded = int(round(row['ToolLife_predicted'] / 50) * 50)
+    return rounded if rounded >= row['PresetCounter'] else '-'
 
 
 GetLowestCPK()      
