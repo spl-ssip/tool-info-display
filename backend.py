@@ -211,7 +211,7 @@ def load_data(limit: int = 1000):
         INTO #DT FROM [SPLOEE].[dbo].[OEEDownTime] DT
         LEFT OUTER JOIN [SPLOEE].[dbo].[OEEOUTPUTKEP] Kep ON DT.ID=Kep.ID
         WHERE Kep.ProdnDate=@ProdnDate AND Kep.ProdnShift=@ProdnShift
-        AND DT.TechRequired=1
+        AND DT.TechRequired=1 AND DT.Status = 'OPEN'
         AND Kep.MacID IN (SELECT MachineID FROM #ToolSummary)
         ORDER BY MacID DESC
 
@@ -270,7 +270,10 @@ def load_data(limit: int = 1000):
         FROM #ToolSummary
         LEFT OUTER JOIN #MacInfo ON #MacInfo.InMacID=#ToolSummary.MachineID
 
-        SELECT * FROM #ToolSummary ORDER BY MacLEDRed DESC,MacLEDYellow DESC,TechRequired desc,MacLEDGreen desc,DurationMins
+        SELECT * FROM #ToolSummary ORDER BY 
+        -- CASE WHEN MaterialCode IS NULL THEN 1 ELSE 0 END, 
+        MacLEDRed DESC,MacLEDYellow DESC,TechRequired desc,MacLEDGreen desc,DurationMins
+        
         -- SELECT * FROM #ToolSummary ORDER BY DurationMins
         -- SELECT * FROM #ToolInfo ORDER BY DurationMins
 
@@ -425,7 +428,7 @@ def load_data_all():
         SELECT TOP 1 @ProdnShift=Shift,@PrevDay=CAST(PreviousDay AS INT) FROM mdm.dbo.TSHIFT
         WHERE Plant=@Plant AND ISNULL(DelFlag,0)=0 AND CAST(getdate() AS TIME)
         BETWEEN StartTime AND EndTime
-        SET @ProdnDate = DATEADD(d,-@PrevDay,CAST(getdate() AS DATE))
+        SET @ProdnDate = DATEADD(d,-@PrevDay,CAST(getdate() AS DATE))
 
         SELECT DT.ID,Kep.MacID,DT.TechRequired,
         DATEDIFF(MINUTE, (CASE WHEN UpdateDate IS NULL THEN CreatedDate ELSE UpdateDate END), GetDate()) AS TechRequestMin
@@ -450,8 +453,8 @@ def load_data_all():
         --AND SessionStatus='RUNNING'
 
         --UPDATE #ToolSummary SET
-        --	#ToolSummary.MaterialCode=#Session.MaterialCode,
-        --	#ToolSummary.MaterialDesc=#Session.MaterialDescription
+        -- #ToolSummary.MaterialCode=#Session.MaterialCode,
+        -- #ToolSummary.MaterialDesc=#Session.MaterialDescription
         --FROM #ToolSummary
         --LEFT OUTER JOIN #Session ON #Session.MachineID=#ToolSummary.MachineID
 
@@ -482,14 +485,21 @@ def load_data_all():
         FROM #ToolSummary
         LEFT OUTER JOIN #MacInfo ON #MacInfo.InMacID=#ToolSummary.MachineID
 
-
         SELECT
-        Location, ToolingMainCategory AS [Turret], ToolingStation AS [Tool], ToolingSubCategory AS [Process], DurationMins AS [Balance (mins)], Balance AS [Balance (pcs)], MachineID, ToolNoID,StartDate,TotalCounter,PresetCounter,LoadX_Alm,LoadZ_Alm,mmToolID
+        Location, ToolingMainCategory AS [Turret], #ToolInfo.ToolingStation AS [Tool], ToolingSubCategory AS [Process], 
+        DurationMins AS [Balance (mins)], Balance AS [Balance (pcs)], 
+        #ToolInfo.MachineID, #ToolInfo.ToolNoID,#ToolInfo.StartDate,
+        TotalCounter,PresetCounter,TLP.ToolLife_predicted,
+        LoadX_Alm,LoadZ_Alm,mmToolID
         FROM #ToolInfo
+        LEFT OUTER JOIN ToolLifePrediction TLP 
+            ON TLP.MachineId=#ToolInfo.MachineId 
+            AND TLP.Turret=#ToolInfo.ToolingMainCategory
+            AND TLP.ToolingStation=#ToolInfo.ToolingStation
         ORDER BY Location, DurationMins
 
         DROP TABLE #TL,#ToolLife,#Session,#WCMachineID,#ToolInfo,#ToolSummary,#DT,#MacInfo
-        --DROP TABLE #DT,#MacInfo
+        --DROP TABLE #DT,#MacInfo 
         '''
         df = pd.read_sql(query, conn)
         conn.close()
