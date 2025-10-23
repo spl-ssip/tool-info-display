@@ -702,7 +702,7 @@ def plot_OffSet_History_Graph(df,selectedStation,selectedAxis,MachineName):
     fig.update_layout(
         title=f'Diff of Offest {selectedAxis}',
         xaxis_title='Counter',
-        yaxis_title='Offset difference',
+        yaxis_title='Offset difference (mm)',
         legend=dict(font=dict(size=12)),
         width=1200,
         height=400,

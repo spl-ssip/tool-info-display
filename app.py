@@ -424,7 +424,7 @@ def ShowTimerInfo():
                 df = df[cols].reset_index(drop=True)
                 df = BalanceClustering(df)
                 
-                df['ToolLife_final'] = df.apply(process_tool_life, axis=1)
+                df['ToolLife_predicted_final'] = df.apply(process_tool_life, axis=1)
 
                 #print(df)
                 min_balance = df['Balance (mins)'].min()
@@ -434,7 +434,7 @@ def ShowTimerInfo():
 
                 # Header row
                 header_cols = st.columns([1, 1, 2, 1, 1,1,1, 1,1,1])
-                header_titles = ['Turret', 'Tool', 'Process','Preset (pcs)','Predicted (pcs)','Actual (pcs)', 'Balance (pcs)', 'Balance (mins)', 'LoadX', 'LoadZ']
+                header_titles = ['Turret', 'Tool', 'Process','Predicted (pcs)','Preset (pcs)','Actual (pcs)', 'Balance (pcs)', 'Balance (mins)', 'LoadX', 'LoadZ']
                 for col, title in zip(header_cols, header_titles):
                     col.markdown(f"**{title}**")
                 
@@ -459,8 +459,8 @@ def ShowTimerInfo():
                     cols[0].markdown(f"<div style='{style}'>{row['Turret']}</div>", unsafe_allow_html=True)
                     cols[1].markdown(f"<div style='{style}'>{row['Tool']} ({row['ToolNoID']})</div>", unsafe_allow_html=True)
                     cols[2].markdown(f"<div>{row['Process']} - {row['mmToolID']}</div>", unsafe_allow_html=True)
-                    cols[3].markdown(f"<div>{row['PresetCounter']}</div>", unsafe_allow_html=True)
-                    cols[4].markdown(f"<div>{row['ToolLife_final']}</div>", unsafe_allow_html=True)
+                    cols[3].markdown(f"<div>{row['ToolLife_predicted_final']}</div>", unsafe_allow_html=True)
+                    cols[4].markdown(f"<div>{row['PresetCounter']}</div>", unsafe_allow_html=True)
                     cols[5].markdown(f"<div>{row['TotalCounter']}</div>", unsafe_allow_html=True)
                     cols[6].markdown(f"<div>{row['Balance (pcs)']}</div>", unsafe_allow_html=True)
                     cols[7].markdown(f"<div style='{style}'>{row['Balance (mins)']}</div>", unsafe_allow_html=True)
