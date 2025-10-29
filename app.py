@@ -181,7 +181,7 @@ def ShowTimerInfo():
         with col2:
             # Header row
             header_cols = st.columns([1,1,1, 1,1,1, 1, 1,1,1])
-            header_titles = ['Machine','Tech Call (min)','Status','Cnt Down(min)','Change Time','Tool Change', 'Tool Detail', 'History', 'Insp Detail','KPI']
+            header_titles = ['Machine','Tech Call (min)','Status','Cnt Down(min)','Change Time','Tool Change', 'Tool Detail', 'History', 'Ppk','KPI']
             for col, title in zip(header_cols, header_titles):
                 col.markdown(
                     f"<div style='text-align: center; border-bottom: 2px solid white; font-size: 1.1vw; font-weight: bold;'>{title}</div>",
@@ -203,7 +203,6 @@ def ShowTimerInfo():
                                         {row['Location']} 
                                     </strong></div>""", unsafe_allow_html=True)  
                     
-
                 with colTechCall:
                     if row['TechRequired']:
                         if row['MacErrorType'] == 2:
@@ -364,14 +363,15 @@ def ShowTimerInfo():
                             }}
                             
                             button div[data-testid="stMarkdownContainer"] p {{
-                                        font-size: 1.1vw !important;
+                                        font-size: 1.3vw !important;
                                         margin: 0;
+                                        font-weight:500;
                                     }}
 
                             """,
                     ):
                         # Store selected materialcode for plotting at bottom section
-                        if st.button(f"Ppk = {LowestPpk}", key=f"btn_{row['MachineID']}", use_container_width=True,type=buttonType):
+                        if st.button(f"{LowestPpk}", key=f"btn_{row['MachineID']}", use_container_width=True,type=buttonType):
                             # #toggle off
                             # if st.session_state.clicked_materialcode == row['MaterialCode']:
                             #     st.session_state.clicked_materialcode = None # clear session state
