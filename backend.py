@@ -489,13 +489,14 @@ def load_data_all():
         Location, ToolingMainCategory AS [Turret], #ToolInfo.ToolingStation AS [Tool], ToolingSubCategory AS [Process], 
         DurationMins AS [Balance (mins)], Balance AS [Balance (pcs)], 
         #ToolInfo.MachineID, #ToolInfo.ToolNoID,#ToolInfo.StartDate,
-        TotalCounter,PresetCounter,TLP.ToolLife_predicted,TLP.features_supporting_high_prediction,
+        TotalCounter,PresetCounter,TLP.ToolLife_predicted,TLP.Segment_Based_Explanation_HTML,
         LoadX_Alm,LoadZ_Alm,mmToolID
         FROM #ToolInfo
         LEFT OUTER JOIN ToolLifePrediction TLP 
             ON TLP.MachineId=#ToolInfo.MachineId 
             AND TLP.Turret=#ToolInfo.ToolingMainCategory
             AND TLP.ToolingStation=#ToolInfo.ToolingStation
+            AND TLP.IsLatestPrediction = 1
         ORDER BY Location, DurationMins
 
         DROP TABLE #TL,#ToolLife,#Session,#WCMachineID,#ToolInfo,#ToolSummary,#DT,#MacInfo
