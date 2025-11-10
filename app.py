@@ -419,7 +419,7 @@ def ShowTimerInfo():
                 st.button("❌ Close",key = f'close_{st.session_state.clicked_location}' , on_click=clear_selection_clicked_location)
                 st.markdown(f"### 📋 Upcoming Tool Change for {st.session_state.clicked_location}")
 
-                cols = ['Turret','Tool','Process','Balance (mins)', 'Balance (pcs)','MachineID', 'ToolNoID', 'StartDate', 'TotalCounter','PresetCounter', 'LoadX_Alm', 'LoadZ_Alm','mmToolID','ToolLife_predicted','features_supporting_high_prediction']
+                cols = ['Turret','Tool','Process','Balance (mins)', 'Balance (pcs)','MachineID', 'ToolNoID', 'StartDate', 'TotalCounter','PresetCounter', 'LoadX_Alm', 'LoadZ_Alm','mmToolID','ToolLife_predicted','Segment_Based_Explanation_HTML']
                 df = df_tool_data_all[df_tool_data_all['Location']==st.session_state.clicked_location]
                 df = df[cols].reset_index(drop=True)
                 df = BalanceClustering(df)
