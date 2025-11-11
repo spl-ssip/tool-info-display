@@ -193,6 +193,9 @@ def ShowTimerInfo():
         
         with col2:
             for index, row in filtered_df.iterrows():   
+                
+                NoToolDataFlag =  row['ToolingStation'] == 9999
+                    
                 # Create 3 columns: machine name | timer | button
                 col_name,colTechCall,colMacStatus, col_timer,colChangeTime,colToolChange, col_tool, col_history, col_button, col_kpi = st.columns([1,1,1, 1,1,1, 1, 1,1,1])  # adjust ratios as needed
 
@@ -246,104 +249,162 @@ def ShowTimerInfo():
                                     </strong>{colorUI}</div>""", unsafe_allow_html=True) 
 
                 with col_timer:
-                    backGroundColor, blink_style = set_timer_style(row['DurationMins'])
+                    if NoToolDataFlag:
+                        st.markdown(
+                            f"""
+                            <style>
+                                @keyframes blinker {{
+                                    50% {{ opacity: 0; }}
+                                }}
+                            </style>
+                            <div class='circle-container' style="color: #555755; font-size: 1.99vw; justify-content: space-evenly;">
+                                <span> N/A </span>
+                            </div>
+                            """,
+                            unsafe_allow_html=True,
+                        )
+                    else:
+                        
+                        backGroundColor, blink_style = set_timer_style(row['DurationMins'])
 
-                    st.markdown(
-                        f"""
-                        <style>
-                            @keyframes blinker {{
-                                50% {{ opacity: 0; }}
-                            }}
-                        </style>
-                        <div class='circle-container' style="color: {backGroundColor}; font-size: 1.99vw; {blink_style};justify-content: space-evenly;">
-                            <span>{row['DurationMins']}</span>
-                        </div>
-                        """,
-                        unsafe_allow_html=True,
-                    )
+                        st.markdown(
+                            f"""
+                            <style>
+                                @keyframes blinker {{
+                                    50% {{ opacity: 0; }}
+                                }}
+                            </style>
+                            <div class='circle-container' style="color: {backGroundColor}; font-size: 1.99vw; {blink_style};justify-content: space-evenly;">
+                                <span>{row['DurationMins']}</span>
+                            </div>
+                            """,
+                            unsafe_allow_html=True,
+                        )
+                        
                 with colChangeTime:
-                    backGroundColor, blink_style = set_timer_style(row['DurationMins'])
-                    currentTime = datetime.now()
-                    ToolChangeTime = currentTime + timedelta(minutes=row['DurationMins'])
+                    if NoToolDataFlag:
+                        st.markdown(
+                            f"""
+                            <style>
+                                @keyframes blinker {{
+                                    50% {{ opacity: 0; }}
+                                }}
+                            </style>
+                            <div class='circle-container' style="color: #555755; font-size: 1.99vw; justify-content: space-evenly;">
+                                <span> N/A </span>
+                            </div>
+                            """,
+                            unsafe_allow_html=True,
+                        )
+                    else:
+                        backGroundColor, blink_style = set_timer_style(row['DurationMins'])
+                        currentTime = datetime.now()
+                        ToolChangeTime = currentTime + timedelta(minutes=row['DurationMins'])
 
-                    st.markdown(
-                        f"""
-                        <style>
-                            @keyframes blinker {{
-                                50% {{ opacity: 0; }}
-                            }}
-                        </style>
-                        <div class='circle-container' style="color: {backGroundColor}; font-size: 1.99vw; {blink_style};justify-content: space-evenly;">
-                            <span>{ToolChangeTime.strftime('%I:%M %p').lstrip('0')}</span>
-                        </div>
-                        """,
-                        unsafe_allow_html=True,
-                    )
+                        st.markdown(
+                            f"""
+                            <style>
+                                @keyframes blinker {{
+                                    50% {{ opacity: 0; }}
+                                }}
+                            </style>
+                            <div class='circle-container' style="color: {backGroundColor}; font-size: 1.99vw; {blink_style};justify-content: space-evenly;">
+                                <span>{ToolChangeTime.strftime('%I:%M %p').lstrip('0')}</span>
+                            </div>
+                            """,
+                            unsafe_allow_html=True,
+                        )
                     
                 with colToolChange:
-                    cols = ['Turret','Tool','Process','Balance (mins)', 'Balance (pcs)','MachineID', 'ToolNoID', 'StartDate', 'TotalCounter']
-                    df = df_tool_data_all[df_tool_data_all['Location']==row['Location']]
-                    df = df[cols].reset_index(drop=True)
-                    df = df[cols].reset_index(drop=True)
-                    df = BalanceClustering(df)
-                    
-                    min_balance = df['Balance (mins)'].min()
-                    min_cluster = df[df['Balance (mins)'] == min_balance]['Hierarchical_Distance'].iloc[0]
-                    filtered_df = df[(df['Hierarchical_Distance'] == min_cluster) | (df['Balance (mins)'] <= (min_balance + Tool_Change_min))]
-                    backGroundColor, blink_style = set_timer_style(row['DurationMins'])
+                    if NoToolDataFlag:
+                        st.markdown(
+                            f"""
+                            <style>
+                                @keyframes blinker {{
+                                    50% {{ opacity: 0; }}
+                                }}
+                            </style>
+                            <div class='circle-container' style="color: #555755; font-size: 1.99vw;justify-content: space-evenly;">
+                                <span> N/A </span>
+                            </div>
+                            """,
+                            unsafe_allow_html=True,
+                        )  
+                        
+                    else:
+                        cols = ['Turret','Tool','Process','Balance (mins)', 'Balance (pcs)','MachineID', 'ToolNoID', 'StartDate', 'TotalCounter']
+                        df = df_tool_data_all[df_tool_data_all['Location']==row['Location']]
+                        df = df[cols].reset_index(drop=True)
+                        df = df[cols].reset_index(drop=True)
+                        df = BalanceClustering(df)
+                        
+                        min_balance = df['Balance (mins)'].min()
+                        min_cluster = df[df['Balance (mins)'] == min_balance]['Hierarchical_Distance'].iloc[0]
+                        filtered_df = df[(df['Hierarchical_Distance'] == min_cluster) | (df['Balance (mins)'] <= (min_balance + Tool_Change_min))]
+                        backGroundColor, blink_style = set_timer_style(row['DurationMins'])
 
-                    st.markdown(
-                        f"""
-                        <style>
-                            @keyframes blinker {{
-                                50% {{ opacity: 0; }}
-                            }}
-                        </style>
-                        <div class='circle-container' style="color: {backGroundColor}; font-size: 1.99vw; {blink_style};justify-content: space-evenly;">
-                            <span>{len(filtered_df)}</span>
-                        </div>
-                        """,
-                        unsafe_allow_html=True,
-                    )                    
+                        st.markdown(
+                            f"""
+                            <style>
+                                @keyframes blinker {{
+                                    50% {{ opacity: 0; }}
+                                }}
+                            </style>
+                            <div class='circle-container' style="color: {backGroundColor}; font-size: 1.99vw; {blink_style};justify-content: space-evenly;">
+                                <span>{len(filtered_df)}</span>
+                            </div>
+                            """,
+                            unsafe_allow_html=True,
+                        )                    
                             
                 with col_tool:
-                    buttonType = "primary" if row['LoadPeak_Alm_L'] or row['LoadPeak_Warn_L'] or row['LoadPeak_Alm_R'] or row['LoadPeak_Warn_R'] else 'secondary'
-
                     st.markdown("<div style='height:25px;'></div>", unsafe_allow_html=True)  # Top spacer
 
-                    # Store selected location for showing details at bottom section
-                    if st.button("Show 🛠️", key=f"btn_{row['Location']}", use_container_width=True,type=buttonType):
-                        # #toggle off
-                        # if st.session_state.clicked_location == row['Location']:
-                        #     st.session_state.clicked_location = None # clear session state
-                        # #toggle on
-                        # else:
-                        st.session_state.clicked_location = row['Location'] # update session state
+                    if NoToolDataFlag:
+                        st.button("Show 🛠️", key=f"btn_{row['Location']}", use_container_width=True,disabled=True)
+                        
+                    else:
+                        buttonType = "primary" if row['LoadPeak_Alm_L'] or row['LoadPeak_Warn_L'] or row['LoadPeak_Alm_R'] or row['LoadPeak_Warn_R'] else 'secondary'
 
-                        st.session_state.clicked_materialcode = None  # 👈 force close the clicked_materialcode button
-                        st.session_state.clicked_materialdesc = None  # 👈 Reset material description
-                        st.session_state.clicked_location_History = None # 👈 force close the clicked_location_History button
-                        st.session_state.clicked_search_History = None # 👈 force close the clicked_search_History button
-                        st.session_state.clicked_KPI = None # 👈 force close the clicked_KPI button
-                        st.rerun()
+                        
+                        # Store selected location for showing details at bottom section
+                        if st.button("Show 🛠️", key=f"btn_{row['Location']}", use_container_width=True,type=buttonType):
+                            # #toggle off
+                            # if st.session_state.clicked_location == row['Location']:
+                            #     st.session_state.clicked_location = None # clear session state
+                            # #toggle on
+                            # else:
+                            st.session_state.clicked_location = row['Location'] # update session state
+
+                            st.session_state.clicked_materialcode = None  # 👈 force close the clicked_materialcode button
+                            st.session_state.clicked_materialdesc = None  # 👈 Reset material description
+                            st.session_state.clicked_location_History = None # 👈 force close the clicked_location_History button
+                            st.session_state.clicked_search_History = None # 👈 force close the clicked_search_History button
+                            st.session_state.clicked_KPI = None # 👈 force close the clicked_KPI button
+                            st.rerun()
 
                 with col_history:
-                    st.markdown(f"""<div style='height:25px;'></div>""", unsafe_allow_html=True)  # Top spacer
-                    # Store selected location for showing details at bottom section
-                    if st.button("History 🛠️", key=f"btn_{row['Location']}_History", use_container_width=True):
-                        # #toggle off
-                        # if st.session_state.clicked_location == row['Location']:
-                        #     st.session_state.clicked_location = None # clear session state
-                        # #toggle on
-                        # else:
-                        st.session_state.clicked_location_History = row['Location'] # update session state
-                        st.session_state.clicked_machineID_History = row['MachineID'] # update session state
+                    st.markdown("<div style='height:25px;'></div>", unsafe_allow_html=True)  # Top spacer
 
-                        st.session_state.clicked_materialcode = None  # 👈 force close the clicked_materialcode button
-                        st.session_state.clicked_materialdesc = None  # 👈 Reset material description
-                        st.session_state.clicked_location = None # 👈 force close the clicked_location button
-                        st.session_state.clicked_KPI = None # 👈 force close the clicked_KPI button
-                        st.rerun()
+                    if NoToolDataFlag:
+                        st.button("History 🛠️", key=f"btn_{row['Location']}_History", use_container_width=True,disabled=True)
+                        
+                    else:
+                        # Store selected location for showing details at bottom section
+                        if st.button("History 🛠️", key=f"btn_{row['Location']}_History", use_container_width=True):
+                            # #toggle off
+                            # if st.session_state.clicked_location == row['Location']:
+                            #     st.session_state.clicked_location = None # clear session state
+                            # #toggle on
+                            # else:
+                            st.session_state.clicked_location_History = row['Location'] # update session state
+                            st.session_state.clicked_machineID_History = row['MachineID'] # update session state
+
+                            st.session_state.clicked_materialcode = None  # 👈 force close the clicked_materialcode button
+                            st.session_state.clicked_materialdesc = None  # 👈 Reset material description
+                            st.session_state.clicked_location = None # 👈 force close the clicked_location button
+                            st.session_state.clicked_KPI = None # 👈 force close the clicked_KPI button
+                            st.rerun()
             
                 with col_button:
                     
@@ -388,17 +449,22 @@ def ShowTimerInfo():
                             st.rerun()
                             
                 with col_kpi:
-                    st.markdown(f"""<div style='height:25px;'></div>""", unsafe_allow_html=True)
-                    if st.button("KPI 🛠️", key=f"btn_{row['Location']}_KPI", use_container_width=True):
-                        st.session_state.clicked_KPI = row['MachineID'] # update session state
-                        st.session_state.clicked_Common_Location = row['Location']
+                    st.markdown("<div style='height:25px;'></div>", unsafe_allow_html=True)  # Top spacer
 
-                        st.session_state.clicked_materialcode = None  # 👈 force close the clicked_materialcode button
-                        st.session_state.clicked_materialdesc = None  # 👈 Reset material description
-                        st.session_state.clicked_location = None # 👈 force close the clicked_location button
-                        st.session_state.clicked_location_History = None # 👈 force close the clicked_location_History button
-                        st.session_state.clicked_search_History = None # 👈 force close the clicked_search_History button
-                        st.rerun()
+                    if NoToolDataFlag:
+                        st.button("KPI 🛠️", key=f"btn_{row['Location']}_KPI", use_container_width=True,disabled=True)
+                        
+                    else:
+                        if st.button("KPI 🛠️", key=f"btn_{row['Location']}_KPI", use_container_width=True):
+                            st.session_state.clicked_KPI = row['MachineID'] # update session state
+                            st.session_state.clicked_Common_Location = row['Location']
+
+                            st.session_state.clicked_materialcode = None  # 👈 force close the clicked_materialcode button
+                            st.session_state.clicked_materialdesc = None  # 👈 Reset material description
+                            st.session_state.clicked_location = None # 👈 force close the clicked_location button
+                            st.session_state.clicked_location_History = None # 👈 force close the clicked_location_History button
+                            st.session_state.clicked_search_History = None # 👈 force close the clicked_search_History button
+                            st.rerun()
                             
 
     # Placeholder for dynamic content
@@ -591,7 +657,6 @@ if st.session_state.clicked_materialcode:
             st.button("❌ Close",key = f'close_{st.session_state.clicked_materialcode}', on_click=clear_selection_clicked_materialcode)
             for specno in specnoList['BalloonNo'].unique():
                 df_inspection_data = get_inspection_data_cached(materialcode, specno)
-
                 if not df_inspection_data.empty:
                     # Calculate ppk
                     df_inspection_data['LSL'] = pd.to_numeric(df_inspection_data['LSL'], errors='coerce')

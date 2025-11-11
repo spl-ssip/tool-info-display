@@ -87,8 +87,12 @@ def load_data(limit: int = 1000):
         conn = get_db_connection()
         query = f'''
         SET NOCOUNT ON
-        SET ANSI_WARNINGS OFF
-        ;
+        SET ANSI_WARNINGS OFF;
+
+        -- 01/01/9999 Add in TechCall with MHA/Mac Error
+        -- 01/01/9999 Add in ToolLifePrediction
+        -- 06/11/2025 Add in Machine without ToolLife information (Only for Technical Call Function)
+        -- 11/11/2025 Add in Material information
 
         DECLARE @Plant INT=2100
         ------------------------------------------- ToolCounter ------------------------------------
@@ -144,19 +148,19 @@ def load_data(limit: int = 1000):
         ------------------------------------------- Revise ToolCounter (Muratec Data) 27/06/25 ------------------------------------
         UPDATE TI 
         SET 
-            TI.PresetCounter = TC.ToolSetPoint,
-            TI.Balance = TC.ToolBalance,
-            TI.TotalCounter = TC.ToolQty
+        TI.PresetCounter = TC.ToolSetPoint,
+        TI.Balance = TC.ToolBalance,
+        TI.TotalCounter = TC.ToolQty
         FROM 
-            #ToolInfo TI 
+        #ToolInfo TI 
         INNER JOIN ToolCount TC ON 
-            TI.MachineID = TC.MacID
-            AND TI.ToolingMainCategory = TC.MainCategory
-            AND TI.ToolingStation = TC.ToolStation
+        TI.MachineID = TC.MacID
+        AND TI.ToolingMainCategory = TC.MainCategory
+        AND TI.ToolingStation = TC.ToolStation
 
         UPDATE #ToolInfo SET Balance=0 WHERE Balance<0
         UPDATE #ToolInfo SET DurationMins=(ISNULL(Balance,0)*ISNULL(MesCT,0))/60
-        ------------------------------------------- ToolLife Summary ------------------------------------
+        ------------------------------------------- ToolLife Summary （Add each Mac Top1 into Summary Table) ------------------------------------
         DECLARE @RowNum INT=1
         DECLARE @TotalRow INT
         SET @TotalRow = (SELECT COUNT(DISTINCT MachineID) from #ToolInfo)
@@ -183,18 +187,33 @@ def load_data(limit: int = 1000):
         LoadPeak_Warn_L BIT,
         LoadPeak_Alm_R BIT,
         LoadPeak_Warn_R BIT,
+        MacWithLED BIT,
         )
 
         WHILE @RowNum <= @TotalRow
         BEGIN
-            INSERT INTO #ToolSummary SELECT TOP 1 MachineID,Location,MaterialCode,MaterialDescription,
-                ToolingStation,TotalCounter,PresetCounter,Balance,DurationMins,0,0,0,0,0,0,0,0,0,0,0,0 
-            FROM #ToolInfo
-            WHERE MachineID NOT IN (SELECT MachineID FROM #ToolSummary)
-            ORDER BY DurationMins
-            SET @RowNum= @RowNum+1
+        INSERT INTO #ToolSummary SELECT TOP 1 MachineID,Location,MaterialCode,MaterialDescription,
+            ToolingStation,TotalCounter,PresetCounter,Balance,DurationMins,0,0,0,0,0,0,0,0,0,0,0,0,0 
+        FROM #ToolInfo
+        WHERE MachineID NOT IN (SELECT MachineID FROM #ToolSummary)
+        ORDER BY DurationMins
+        SET @RowNum= @RowNum+1
         END
 
+        ------------------------------------------- Special handle for Technician Call & LED (without mmTool data) - Start ------------------------------------
+        -- 06/11/2025 Add in Machine without ToolLife information (Only for Technical Call Function)
+        -- 11/11/2025 Add in Material information
+        INSERT INTO #ToolSummary
+                SELECT MacInfo.InMacID,WC.MachineNo Location,MacInfo.pMatCode,MacInfo.pMatDesc,
+                9999,9999,9999,9999,9999,0,0,0,0,0,0,0,0,0,0,0,0,MacWithLED  
+        FROM KEPDATALOGGER.DBO.LogGetMatInfo MacInfo
+        JOIN MDM.DBO.WorkCenterMachineID WC ON MacInfo.InMacID=WC.MachineID
+        WHERE ID in (
+            SELECT MAX(id) FROM KEPDATALOGGER.DBO.LogGetMatInfo 
+            WHERE InMacID NOT IN (SELECT MachineID FROM #ToolSummary)
+            GROUP BY InMacID)
+        AND Plant=@Plant AND Dept='MS' AND isActive=1 AND DelFlag=0
+        ------------------------------------------- Special handle for Technician Call & LED (without mmTool data) - End ------------------------------------
         ------------------------------------------- Technical Request Information ------------------------------------
         DECLARE @ProdnShift INT
         DECLARE @PrevDay INT
@@ -217,8 +236,8 @@ def load_data(limit: int = 1000):
 
         UPDATE #ToolSummary
         SET #ToolSummary.TechRequired=ISNULL(#DT.TechRequired,0),
-            #ToolSummary.TechRequestMin=ISNULL(#DT.TechRequestMin,0),
-            #ToolSummary.MacErrorType=ISNULL(#DT.MacErrorType,0)
+        #ToolSummary.TechRequestMin=ISNULL(#DT.TechRequestMin,0),
+        #ToolSummary.MacErrorType=ISNULL(#DT.MacErrorType,0)
         FROM #ToolSummary
         LEFT OUTER JOIN #DT ON #DT.MacID=#ToolSummary.MachineID
 
@@ -251,14 +270,15 @@ def load_data(limit: int = 1000):
         -- WHERE MacInfo.InMacID IN ('MSNLTH09-29','MSNLTH13-11')
         GROUP BY MacInfo.InMacID)
         SELECT CTE1.*,MacLEDGreen,MacLEDYellow,MacLEDRed,MacStatus,
-        LoadPeak_Alm_L,LoadPeak_Warn_L,LoadPeak_Alm_R,LoadPeak_Warn_R 
+        LoadPeak_Alm_L,LoadPeak_Warn_L,LoadPeak_Alm_R,LoadPeak_Warn_R,MacWithLED
         INTO #MacInfo FROM CTE1
         LEFT JOIN (SELECT ID, InMacID,MacLEDGreen,MacLEDYellow,MacLEDRed,MacStatus,
-                            LoadPeak_Alm_L,LoadPeak_Warn_L,LoadPeak_Alm_R,LoadPeak_Warn_R 
-                    FROM [KEPDATALOGGER].[dbo].[LogGetMatInfo]) AS R1
+                        LoadPeak_Alm_L,LoadPeak_Warn_L,LoadPeak_Alm_R,LoadPeak_Warn_R,MacWithLED
+                FROM [KEPDATALOGGER].[dbo].[LogGetMatInfo]) AS R1
         ON R1.InMacID = CTE1.InMacID and R1.ID = CTE1.MaxID;
 
         UPDATE #ToolSummary SET
+        #ToolSummary.MacWithLED=ISNULL(#MacInfo.MacWithLED,0),
         #ToolSummary.MacLEDGreen=ISNULL(#MacInfo.MacLEDGreen,0),
         #ToolSummary.MacLEDYellow=ISNULL(#MacInfo.MacLEDYellow,0),
         #ToolSummary.MacLEDRed=ISNULL(#MacInfo.MacLEDRed,0),
@@ -270,14 +290,36 @@ def load_data(limit: int = 1000):
         FROM #ToolSummary
         LEFT OUTER JOIN #MacInfo ON #MacInfo.InMacID=#ToolSummary.MachineID
 
+        ------------------------------------------- Special handle for Technician Call & LED (without mmTool data) - Start ------------------------------------
+        -- 06/11/2025 Add in Machine without ToolLife information (Only for Technical Call Function)
+        UPDATE #ToolSummary SET MacLEDGreen=1,MacLEDRed=0,MacLEDYellow=0 
+        WHERE MacStatus=3 AND MacWithLED=0
+
+        -- UPDATE #ToolSummary SET MacLEDRed=1,MacLEDGreen=0,MacLEDYellow=0 
+        -- WHERE MacStatus=0 AND MacWithLED=0
+        ------------------------------------------- Special handle for Technician Call & LED (without mmTool data) - End ------------------------------------
+
         SELECT * FROM #ToolSummary ORDER BY 
         -- CASE WHEN MaterialCode IS NULL THEN 1 ELSE 0 END, 
         MacLEDRed DESC,MacLEDYellow DESC,TechRequired desc,MacLEDGreen desc,DurationMins
-        
-        -- SELECT * FROM #ToolSummary ORDER BY DurationMins
-        -- SELECT * FROM #ToolInfo ORDER BY DurationMins
 
-        DROP TABLE #TL,#ToolLife,#Session,#WCMachineID,#ToolInfo,#ToolSummary,#DT,#MacInfo,#MacStatus
+        -- ToolLife data detail with Predict value
+        --SELECT
+        --Location, ToolingMainCategory AS [Turret], #ToolInfo.ToolingStation AS [Tool], ToolingSubCategory AS [Process], 
+        --DurationMins AS [Balance (mins)], Balance AS [Balance (pcs)], 
+        --#ToolInfo.MachineID, #ToolInfo.ToolNoID,#ToolInfo.StartDate,
+        --TotalCounter,PresetCounter,TLP.ToolLife_predicted,TLP.features_supporting_high_prediction,
+        --LoadX_Alm,LoadZ_Alm,mmToolID
+        --FROM #ToolInfo
+        --LEFT OUTER JOIN ToolLifePrediction TLP 
+        --    ON TLP.MachineId=#ToolInfo.MachineId 
+        --    AND TLP.Turret=#ToolInfo.ToolingMainCategory
+        --    AND TLP.ToolingStation=#ToolInfo.ToolingStation
+        --ORDER BY Location, DurationMins
+
+        DROP TABLE #TL,#ToolLife,#Session,#WCMachineID,#ToolInfo,#ToolSummary,#DT,#MacInfo --,#MacStatus
+
+
         '''
         df = pd.read_sql(query, conn)
         conn.close()
