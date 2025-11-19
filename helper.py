@@ -3,6 +3,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import plotly.graph_objects as go
 import plotly.figure_factory as ff
+import copy
 
 from sklearn.preprocessing import StandardScaler
 from scipy.cluster.hierarchy import linkage, fcluster
@@ -25,7 +26,7 @@ def set_timer_style(DurationMin):
     DurationMin_Red = config['thresholds']['duration_min']['red']
     DurationMin_Amber = config['thresholds']['duration_min']['amber']
 
-    if DurationMin == DurationMin_Red:
+    if DurationMin <= DurationMin_Red:
         color = 'red'
         blink_style = "animation: blinker 1s linear infinite;"
     elif DurationMin <= DurationMin_Amber:
@@ -712,3 +713,92 @@ def plot_OffSet_History_Graph(df,selectedStation,selectedAxis,MachineName):
     )
 
     return fig
+
+def calculate_savings(Count,cycleTime,DiffPcs,UnitPrice):
+    toolChangeFixTime = 2 
+    WashingFixTime = 2
+    CurrentTime = WashingFixTime + (toolChangeFixTime*Count)
+    OriginalTime = (WashingFixTime+toolChangeFixTime) * Count
+    SavedTime = OriginalTime - CurrentTime
+    ExtraProduce = round((SavedTime * 60) / cycleTime, 2)
+    #print(UnitPrice,DiffPcs)
+    #print(UnitPrice*DiffPcs)
+    return SavedTime,OriginalTime,CurrentTime,ExtraProduce
+    
+
+
+def GetAllMachineToolChange(df_tool_data, df_tool_data_all,Tool_Change_min):
+    
+    if 'ToolChangeNumber' not in df_tool_data.columns:
+        df_tool_data['ToolChangeNumber'] = pd.Series(pd.NA, index=df_tool_data.index, dtype='Int64')
+
+    for index, row in df_tool_data.iterrows():
+        cols = ['Turret','Tool','Process','Balance (mins)', 'Balance (pcs)','MachineID', 'ToolNoID', 'StartDate', 'TotalCounter']
+        df = df_tool_data_all[df_tool_data_all['Location']==row['Location']]
+        df = df[cols].reset_index(drop=True)
+        df = df[cols].reset_index(drop=True)
+        if row['ToolingStation'] != 9999:
+            df = BalanceClustering(df)
+            
+            min_balance = df['Balance (mins)'].min()
+            min_cluster = df[df['Balance (mins)'] == min_balance]['Hierarchical_Distance'].iloc[0]
+            filtered_df = df[(df['Hierarchical_Distance'] == min_cluster) | (df['Balance (mins)'] <= (min_balance + Tool_Change_min))]
+            ToolChangeNumber = len(filtered_df)
+            df_tool_data.loc[index, 'ToolChangeNumber'] = ToolChangeNumber
+            
+    df_tool_data['ToolChangeNumber'] = df_tool_data['ToolChangeNumber'].astype('Int64')
+    return df_tool_data
+
+def GetAllMachineSuggestedChangeToolTime(df_tool_data):
+    MachineStopTime = 10 #minutes
+    ToolChangeTime = 2 #minutes
+    ExtraBuffer = 5  #minutes
+    df_tool_data = df_tool_data.sort_values(by='DurationMins',ascending=False).reset_index(drop=True)
+    if 'SuggestedToolChangeTime' not in df_tool_data.columns:  
+        df_tool_data['SuggestedToolChangeTime'] = pd.Series(pd.NA, index=df_tool_data.index, dtype='Int64')
+    if 'AdjustTime' not in df_tool_data.columns:  
+        df_tool_data['AdjustTime'] = pd.Series(0, index=df_tool_data.index, dtype='Int64')
+
+    
+    for index, row in df_tool_data.iterrows():
+        
+        if row['MacLEDGreen'] and not row['TechRequired'] and row['ToolingStation'] != 9999 and not row['MacLEDRed'] and not row['MacLEDYellow']:
+            df_tool_data['NextDuration'] = df_tool_data['DurationMins'].shift(-1)
+            
+            next_duration = df_tool_data.iloc[index]['NextDuration']
+            if pd.notna(next_duration):
+                nextRecord = df_tool_data.iloc[index+1]
+                CalculateNextFlag = nextRecord['MacLEDGreen'] and not nextRecord['TechRequired'] and nextRecord['ToolingStation'] != 9999 and not nextRecord['MacLEDRed'] and not nextRecord['MacLEDYellow']
+                NextDurationSameFlag = row['DurationMins'] == next_duration
+                if CalculateNextFlag: 
+                    MachineChangeNextToolTime = MachineStopTime + (ToolChangeTime*nextRecord['ToolChangeNumber'])
+                    MachineNextToolTotalTime = MachineChangeNextToolTime + nextRecord['DurationMins']
+                    if MachineNextToolTotalTime>=row['DurationMins']:
+                        OverlappedTime = MachineNextToolTotalTime - row['DurationMins']
+                        PushBackTime = OverlappedTime + ExtraBuffer
+                        if NextDurationSameFlag:
+                            PushBackTime = PushBackTime+nextRecord['AdjustTime']
+                        SuggestedToolChangeTime = nextRecord['DurationMins'] - PushBackTime
+                        df_tool_data.loc[index+1, 'AdjustTime'] = PushBackTime
+                        df_tool_data.loc[index+1, 'SuggestedToolChangeTime'] = SuggestedToolChangeTime
+                    
+    df_tool_data['SuggestedToolChangeTime'] = df_tool_data['SuggestedToolChangeTime'].astype('Int64')
+    return df_tool_data
+
+def SplitToolDataByOperator(df_tool_data):
+    newDf_tool_dataList = []
+    final_df = pd.DataFrame()
+    #df_tool_data['EmpNo'] = '007'
+    for emp_no, group in df_tool_data.groupby('EmpNo', dropna=False):
+        SuggestedDF = GetAllMachineSuggestedChangeToolTime(group)
+        newDf_tool_dataList.append(SuggestedDF)
+
+    # Combine all processed DataFrames
+    if len(newDf_tool_dataList)>1:
+        final_df = pd.concat(newDf_tool_dataList, ignore_index=True)
+    else:
+        final_df = newDf_tool_dataList[0]
+    return final_df
+
+        
+    
