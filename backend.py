@@ -299,7 +299,9 @@ def load_data(limit: int = 1000):
         -- WHERE MacStatus=0 AND MacWithLED=0
         ------------------------------------------- Special handle for Technician Call & LED (without mmTool data) - End ------------------------------------
 
-        SELECT * FROM #ToolSummary ORDER BY 
+        SELECT TS.*,LG.EmpNo,LG.EmpName FROM #ToolSummary TS
+        LEFT OUTER JOIN SPLOEE.DBO.LOGIN LG ON LG.MacID = TS.MachineID AND LG.Status='ONLINE' AND LG.Dept='MS' AND LG.EmpType='OPERATOR'
+        ORDER BY 
         -- CASE WHEN MaterialCode IS NULL THEN 1 ELSE 0 END, 
         MacLEDRed DESC,MacLEDYellow DESC,TechRequired desc,MacLEDGreen desc,DurationMins
 
@@ -345,7 +347,9 @@ def load_data(limit: int = 1000):
                     'LoadPeak_Alm_R':False,
                     'LoadPeak_Warn_R':False,
                     'MacStopMins':'0',
-                    'MacErrorType':'1'}
+                    'MacErrorType':'1',
+                    'EmpNo':'wesd1324',
+                    'EmpName':'Abu'}
         df = pd.DataFrame(data_demo)
 
     return df
@@ -365,7 +369,7 @@ def load_data_all():
         DATEADD(HOUR, 8, TL.StartDate) AS StartDate, GetDate() CompletedDate,TN.ToolPieces,
         mmTool.ToolingStation,mmTool.ProductGroup,mmTool.ToolingClass,mmTool.ToolingMainCategory, mmTool.ToolingSubCategory, mmTool.SAPCode,
         ISNULL(mmTool.PresetCounter,0)PresetCounter,
-        mmTool.LoadX_Alm,mmTool.LoadZ_Alm
+        mmTool.LoadX_Alm,mmTool.LoadZ_Alm,mmTool.UnitPrice
         INTO #ToolLife FROM ToolLife TL
         INNER JOIN (ToolNo TN INNER JOIN mmTool mmTool ON TN.mmToolID=mmTool.ID)
         ON TL.ToolNoId=TN.Id
@@ -398,9 +402,9 @@ def load_data_all():
         AND DelFlag=0 AND IsActive=1 AND Plant=@Plant
 
         ------------------------------------------- ToolLifeDetails In Group ------------------------------------
-        SELECT MachineID,ToolNoID,ToolingMainCategory,ToolingSubCategory,ToolingStation,SUM(TotalCounter) TotalCounter,PresetCounter,StartDate,LoadX_Alm,LoadZ_Alm,mmToolID
+        SELECT MachineID,ToolNoID,ToolingMainCategory,ToolingSubCategory,ToolingStation,SUM(TotalCounter) TotalCounter,PresetCounter,StartDate,LoadX_Alm,LoadZ_Alm,mmToolID,UnitPrice
         INTO #TL FROM #ToolLife
-        GROUP BY MachineID,ToolNoID,ToolingMainCategory,ToolingSubCategory,ToolingStation,PresetCounter,StartDate,LoadX_Alm,LoadZ_Alm,mmToolID
+        GROUP BY MachineID,ToolNoID,ToolingMainCategory,ToolingSubCategory,ToolingStation,PresetCounter,StartDate,LoadX_Alm,LoadZ_Alm,mmToolID,UnitPrice
         ORDER BY MachineID,ToolingMainCategory,ToolingStation
 
         SELECT #TL.*,(#TL.PresetCounter-#TL.TotalCounter) Balance, 
@@ -532,7 +536,7 @@ def load_data_all():
         DurationMins AS [Balance (mins)], Balance AS [Balance (pcs)], 
         #ToolInfo.MachineID, #ToolInfo.ToolNoID,#ToolInfo.StartDate,
         TotalCounter,PresetCounter,TLP.ToolLife_predicted,TLP.Segment_Based_Explanation_HTML,
-        LoadX_Alm,LoadZ_Alm,mmToolID
+        LoadX_Alm,LoadZ_Alm,mmToolID,MesCT,UnitPrice
         FROM #ToolInfo
         LEFT OUTER JOIN ToolLifePrediction TLP 
             ON TLP.MachineId=#ToolInfo.MachineId 
